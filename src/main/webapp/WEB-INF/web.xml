@@ -7,13 +7,28 @@
 
     <servlet>
         <servlet-name>frontController</servlet-name>
-        <servlet-class>sharon.conquerant.sprintmvc.controller.FrontControllerServlet</servlet-class>
+        <servlet-class>main.java.controllers.FrontControllerServlet</servlet-class>
+        <init-param>
+            <param-name>Controller</param-name>
+            <param-value>main.java.controllers</param-value>
+        </init-param>
     </servlet>
 
     <!-- Capture toutes les URLs : /hello/coucou, /foo/bar, etc. -->
     <servlet-mapping>
         <servlet-name>frontController</servlet-name>
         <url-pattern>/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Ancien FrontController de sprint0, conserve et accessible sur /sprint0/* -->
+    <servlet>
+        <servlet-name>sprint0Controller</servlet-name>
+        <servlet-class>sharon.sprintmvc.controller.FrontControllerServlet</servlet-class>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>sprint0Controller</servlet-name>
+        <url-pattern>/sprint0/*</url-pattern>
     </servlet-mapping>
 
 </web-app>
