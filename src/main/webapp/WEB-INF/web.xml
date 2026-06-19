@@ -20,15 +20,4 @@
         <url-pattern>/*</url-pattern>
     </servlet-mapping>
 
-    <!-- Ancien FrontController de sprint0, conserve et accessible sur /sprint0/* -->
-    <servlet>
-        <servlet-name>sprint0Controller</servlet-name>
-        <servlet-class>sharon.sprintmvc.controller.FrontControllerServlet</servlet-class>
-    </servlet>
-
-    <servlet-mapping>
-        <servlet-name>sprint0Controller</servlet-name>
-        <url-pattern>/sprint0/*</url-pattern>
-    </servlet-mapping>
-
 </web-app>
