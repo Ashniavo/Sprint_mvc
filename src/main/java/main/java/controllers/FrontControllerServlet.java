@@ -38,19 +38,33 @@ public class FrontControllerServlet extends HttpServlet {
 
     private void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
         res.setContentType("text/html;charset=UTF-8");
-        String uri = req.getRequestURI();
         PrintWriter out = res.getWriter();
 
-        out.println("<html><body>");
-        out.println(uri);
+        StringBuffer fullUrl = req.getRequestURL();
+        if (req.getQueryString() != null) {
+            fullUrl.append("?").append(req.getQueryString());
+        }
+
+        out.println("<!DOCTYPE html>");
+        out.println("<html><head><title>Sprint MVC</title></head><body>");
+        out.println("<h2>URL demandee :</h2>");
+        out.println("<p style='font-size:1.5em; color:#2a6;'>" + fullUrl + "</p>");
+
+        out.println("<h2>Controleurs detectes (@Controller) :</h2>");
         printClasses(out);
-        out.println("<body><html>");
+
+        out.println("</body></html>");
     }
 
     private void printClasses(PrintWriter out) {
-        for (String s : this.listClasses) {
-            out.println("\n");
-            out.println(s);
+        if (this.listClasses == null || this.listClasses.isEmpty()) {
+            out.println("<p>Aucun controleur trouve.</p>");
+            return;
         }
+        out.println("<ul>");
+        for (String s : this.listClasses) {
+            out.println("<li>" + s + "</li>");
+        }
+        out.println("</ul>");
     }
 }
