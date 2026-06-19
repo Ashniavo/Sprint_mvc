@@ -1,4 +1,4 @@
-package sharon.conquerant.sprintmvc.controller;
+package sharon.sprintmvc.controller;
 
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
