@@ -9,9 +9,8 @@ import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import sharon.sprintmvc.annotation.URLMapping;
-
+import sharon.sprintmvc.utils.UrlKey;
 public class Utils {
 
     public static List<Class<?>> loadClasses(String packageName, Class<? extends Annotation> annotation) throws Exception {
@@ -54,16 +53,17 @@ public class Utils {
         return names;
     }
 
-    public static Map<String, Mapping> buildUrlMapping(List<Class<?>> controllers) {
-        Map<String, Mapping> urlMap = new HashMap<>();
-        for (Class<?> controllerClass : controllers) {
-            for (Method method : controllerClass.getDeclaredMethods()) {
-                if (method.isAnnotationPresent(URLMapping.class)) {
-                    URLMapping urlMapping = method.getAnnotation(URLMapping.class);
-                    urlMap.put(urlMapping.value(), new Mapping(controllerClass, method));
-                }
+    public static Map<UrlKey, Mapping> buildUrlMapping(List<Class<?>> controllers) {
+    Map<UrlKey, Mapping> urlMap = new HashMap<>();
+    for (Class<?> controllerClass : controllers) {
+        for (Method method : controllerClass.getDeclaredMethods()) {
+            if (method.isAnnotationPresent(URLMapping.class)) {
+                URLMapping urlMapping = method.getAnnotation(URLMapping.class);
+                UrlKey key = new UrlKey(urlMapping.value(), urlMapping.method());
+                urlMap.put(key, new Mapping(controllerClass, method));
             }
         }
-        return urlMap;
     }
+    return urlMap;
+}
 }
