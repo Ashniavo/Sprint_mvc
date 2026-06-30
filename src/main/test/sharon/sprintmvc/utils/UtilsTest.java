@@ -27,9 +27,25 @@ public class UtilsTest {
             Controller.class
         );
 
-        Map<String, Mapping> urlMap = Utils.buildUrlMapping(controllers);
+        Map<UrlKey, Mapping> urlMap = Utils.buildUrlMapping(controllers);
 
-        Assertions.assertTrue(urlMap.containsKey("/dept/new"));
-        Assertions.assertTrue(urlMap.containsKey("/dept/list"));
+        UrlKey newKey = new UrlKey("/dept/new", "GET");
+        UrlKey listKey = new UrlKey("/dept/list", "GET");
+
+        Assertions.assertTrue(urlMap.containsKey(newKey));
+        Assertions.assertTrue(urlMap.containsKey(listKey));
+    }
+
+    @Test
+    public void testUrlInconnueNestPasDansLeMapping() throws Exception {
+        List<Class<?>> controllers = Utils.loadClasses(
+            "sharon.sprintmvc.controllers",
+            Controller.class
+        );
+
+        Map<UrlKey, Mapping> urlMap = Utils.buildUrlMapping(controllers);
+
+        UrlKey unknownKey = new UrlKey("/n_importe_quoi", "GET");
+        Assertions.assertFalse(urlMap.containsKey(unknownKey));
     }
 }
