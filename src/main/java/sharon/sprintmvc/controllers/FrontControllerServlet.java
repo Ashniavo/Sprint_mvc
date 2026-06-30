@@ -45,30 +45,35 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private void processRequest(HttpServletRequest req, HttpServletResponse res) throws ServletException, IOException {
-        res.setContentType("text/html;charset=UTF-8");
-        PrintWriter out = res.getWriter();
+    res.setContentType("text/html;charset=UTF-8");
+    PrintWriter out = res.getWriter();   // ← cette ligne manquait !
 
-        String path = req.getPathInfo();
-        if (path == null) {
-            path = req.getServletPath();
-        }
-
-        out.println("<!DOCTYPE html>");
-        out.println("<html><head><title>Sprint MVC</title></head><body>");
-        out.println("<h2>URL demandee :</h2>");
-        out.println("<p style='font-size:1.5em; color:#2a6;'>" + path + "</p>");
-
-        try {
-            executeMapping(path, out);
-        } catch (UrlNotFoundException e) {
-            out.println("<h2 style='color:red;'>Erreur :</h2>");
-            out.println("<p style='color:red;'>" + e.getMessage() + "</p>");
-            out.println("<h3>URLs connues :</h3>");
-            printKnownUrls(out);
-        }
-
-        out.println("</body></html>");
+    String path = req.getPathInfo();
+    if (path == null) {
+        path = req.getServletPath();
     }
+
+    // Supprimer le slash final s'il y en a un (sauf si path = "/")
+    if (path.length() > 1 && path.endsWith("/")) {
+        path = path.substring(0, path.length() - 1);
+    }
+
+    out.println("<!DOCTYPE html>");
+    out.println("<html><head><title>Sprint MVC</title></head><body>");
+    out.println("<h2>URL demandee :</h2>");
+    out.println("<p style='font-size:1.5em; color:#2a6;'>" + path + "</p>");
+
+    try {
+        executeMapping(path, out);
+    } catch (UrlNotFoundException e) {
+        out.println("<h2 style='color:red;'>Erreur :</h2>");
+        out.println("<p style='color:red;'>" + e.getMessage() + "</p>");
+        out.println("<h3>URLs connues :</h3>");
+        printKnownUrls(out);
+    }
+
+    out.println("</body></html>");
+}
 
     private void executeMapping(String url, PrintWriter out) throws UrlNotFoundException {
         if (urlMapping == null || !urlMapping.containsKey(url)) {

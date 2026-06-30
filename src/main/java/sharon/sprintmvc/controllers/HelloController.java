@@ -1,6 +1,6 @@
-package main.java.controllers;
+package sharon.sprintmvc.controllers;
 
-import main.java.annotation.Controller;
+import sharon.sprintmvc.annotation.Controller;
 
 @Controller("HelloController")
 public class HelloController {

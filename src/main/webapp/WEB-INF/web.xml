@@ -7,10 +7,10 @@
 
     <servlet>
         <servlet-name>frontController</servlet-name>
-        <servlet-class>main.java.controllers.FrontControllerServlet</servlet-class>
+        <servlet-class>sharon.sprintmvc.controllers.FrontControllerServlet</servlet-class>
         <init-param>
             <param-name>Controller</param-name>
-            <param-value>main.java.controllers</param-value>
+            <param-value>sharon.sprintmvc.controllers</param-value>
         </init-param>
     </servlet>
 
