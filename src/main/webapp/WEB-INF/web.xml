@@ -5,7 +5,18 @@
                              https://jakarta.ee/xml/ns/jakartaee/web-app_5_0.xsd"
          version="5.0">
 
-    <!-- Listener : scan des routes au demarrage -->
+    <!-- Packages a scanner (separateur configurable) -->
+    <context-param>
+        <param-name>package_list</param-name>
+        <param-value>sharon.app.controllers</param-value>
+    </context-param>
+
+    <context-param>
+        <param-name>list_separator</param-name>
+        <param-value>;</param-value>
+    </context-param>
+
+    <!-- Listener -->
     <listener>
         <listener-class>sharon.sprintmvc.listener.AppServletContextListener</listener-class>
     </listener>
@@ -13,10 +24,6 @@
     <servlet>
         <servlet-name>frontController</servlet-name>
         <servlet-class>sharon.sprintmvc.controllers.FrontControllerServlet</servlet-class>
-        <init-param>
-            <param-name>Controller</param-name>
-            <param-value>sharon.app</param-value>
-        </init-param>
     </servlet>
 
     <servlet-mapping>
