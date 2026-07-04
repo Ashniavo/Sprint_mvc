@@ -24,18 +24,20 @@ public class FrontControllerServlet extends HttpServlet {
 
     @SuppressWarnings("unchecked")
     public void init() throws ServletException {
-        super.init();
-        urlMapping = (Map<UrlKey, Mapping>) getServletContext()
-                        .getAttribute("routesWithMethod");
+    super.init();
 
-        try {
-            String initial = this.getInitParameter("Controller");
-            listClasses = Utils.intoString(Utils.loadClasses(initial, Controller.class));
-        } catch (Exception e) {
-            e.printStackTrace();
-            listClasses = null;
-        }
+    // Recuperer les routes preparees par AppServletContextListener
+    urlMapping = (Map<UrlKey, Mapping>) getServletContext()
+                    .getAttribute("routesWithMethod");
+
+    // Recuperer la liste des controllers
+    List<Class<?>> controllerList = (List<Class<?>>) getServletContext()
+                    .getAttribute("controllerList");
+
+    if (controllerList != null) {
+        listClasses = Utils.intoString(controllerList);
     }
+}
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
