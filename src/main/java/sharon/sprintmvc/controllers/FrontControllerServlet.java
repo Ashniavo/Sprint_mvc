@@ -30,14 +30,16 @@ public class FrontControllerServlet extends HttpServlet {
     urlMapping = (Map<UrlKey, Mapping>) getServletContext()
                     .getAttribute("routesWithMethod");
 
-    // Recuperer la liste des controllers
+    // Recuperer la liste des controllers depuis le contexte
     List<Class<?>> controllerList = (List<Class<?>>) getServletContext()
                     .getAttribute("controllerList");
 
     if (controllerList != null) {
         listClasses = Utils.intoString(controllerList);
     }
-}
+    
+    }
+
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse res)
@@ -52,53 +54,67 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     private void processRequest(HttpServletRequest req, HttpServletResponse res, String httpMethod)
-            throws IOException {
+        throws IOException {
 
-        res.setContentType("text/html;charset=UTF-8");
+    res.setContentType("text/html;charset=UTF-8");
 
-        try (PrintWriter out = res.getWriter()) {
-            out.println("--- Sprint MVC ---");
+    try (PrintWriter out = res.getWriter()) {
 
-            String path = req.getRequestURI().substring(req.getContextPath().length());
+        String path = req.getRequestURI().substring(req.getContextPath().length());
 
-            // Nettoyer le slash final
-            if (path.length() > 1 && path.endsWith("/")) {
-                path = path.substring(0, path.length() - 1);
-            }
-
-            UrlKey key = new UrlKey(path, httpMethod);
-
-            if (urlMapping != null && urlMapping.containsKey(key)) {
-                Mapping mapping = urlMapping.get(key);
-                out.println("Route trouvee : " + key + " -> " + mapping);
-
-                try {
-                    Object controller = mapping.getControllerClass()
-                                               .getDeclaredConstructor()
-                                               .newInstance();
-                    Method method = mapping.getMethod();
-                    Object result = method.invoke(controller);
-
-                    if (result != null) {
-                        out.println("Resultat de la methode :");
-                        out.println(result);
-                    }
-
-                } catch (InstantiationException | IllegalAccessException |
-                         InvocationTargetException | NoSuchMethodException e) {
-                    throw new RuntimeException(
-                        "Impossible d'executer la methode liee a " + key, e);
-                }
-
-            } else {
-                out.println("Aucune route trouvee pour l'URL : " + path);
-                if (urlMapping != null) {
-                    urlMapping.forEach((k, v) -> {
-                        out.println(k + " -> " + v.getControllerClass().getName()
-                                    + "->" + v.getMethod().getName() + "()");
-                    });
-                }
-            }
+        // Nettoyer le slash final
+        if (path.length() > 1 && path.endsWith("/")) {
+            path = path.substring(0, path.length() - 1);
         }
+
+        out.println("<!DOCTYPE html>");
+        out.println("<html><head><title>Sprint MVC</title></head><body>");
+        out.println("<h2>--- Sprint MVC ---</h2>");
+        out.println("<p><b>URL :</b> " + path + "</p>");
+        out.println("<p><b>Methode HTTP :</b> " + httpMethod + "</p>");
+        out.println("<hr/>");
+
+        UrlKey key = new UrlKey(path, httpMethod);
+
+        if (urlMapping != null && urlMapping.containsKey(key)) {
+            Mapping mapping = urlMapping.get(key);
+
+            try {
+                Object controller = mapping.getControllerClass()
+                                           .getDeclaredConstructor()
+                                           .newInstance();
+                Method method = mapping.getMethod();
+                Object result = method.invoke(controller);
+
+                out.println("<p><b>Controller :</b> " + mapping.getControllerClass().getName() + "</p>");
+                out.println("<p><b>Methode executee :</b> " + mapping.getMethod().getName() + "()</p>");
+
+                if (result != null) {
+                    out.println("<p><b>Resultat :</b> " + result + "</p>");
+                }
+
+            } catch (InstantiationException | IllegalAccessException |
+                     InvocationTargetException | NoSuchMethodException e) {
+                throw new RuntimeException(
+                    "Impossible d'executer la methode liee a " + key, e);
+            }
+
+        } else {
+            out.println("<p style='color:red;'><b>Erreur :</b> Aucune route trouvee pour : " + path + "</p>");
+            out.println("<hr/>");
+            out.println("<p><b>URLs connues :</b></p>");
+            out.println("<ul>");
+            if (urlMapping != null) {
+                urlMapping.forEach((k, v) -> {
+                    out.println("<li>" + k.getUrl() + " [" + k.getHttpMethod() + "]"
+                                + " → " + v.getControllerClass().getSimpleName()
+                                + "." + v.getMethod().getName() + "()</li>");
+                });
+            }
+            out.println("</ul>");
+        }
+
+        out.println("</body></html>");
+    }
     }
 }
