@@ -40,8 +40,9 @@ public class FrontControllerServlet extends HttpServlet {
             listClasses = Utils.intoString(controllerList);
         }
 
-        viewPrefix = getServletContext().getInitParameter("view.prefix");
-        viewSuffix = getServletContext().getInitParameter("view.suffix");
+        // Lire prefix et suffix depuis getAttribute (stocke par le listener)
+        viewPrefix = (String) getServletContext().getAttribute("prefix");
+        viewSuffix = (String) getServletContext().getAttribute("suffix");
     }
 
     @Override
@@ -59,7 +60,6 @@ public class FrontControllerServlet extends HttpServlet {
     private void processRequest(HttpServletRequest req, HttpServletResponse res)
             throws IOException, ServletException {
 
-        // Exactement comme sprint5
         String pathInfo = req.getRequestURI().substring(req.getContextPath().length());
         UrlKey key = new UrlKey(pathInfo, req.getMethod());
 
@@ -74,16 +74,13 @@ public class FrontControllerServlet extends HttpServlet {
                 Method method = mapping.getMethod();
                 Object result = method.invoke(controller);
 
-                if (result == null) {
-                    throw new ServletException("La methode liee a " + key + " a retourne null");
-                }
-
                 // Cas 1 : ModelAndView → rediriger vers JSP
                 if (result instanceof ModelAndView) {
                     ModelAndView mav = (ModelAndView) result;
 
-                    if (mav.getValues() != null) {
-                        req.setAttribute("map", mav.getValues());
+                    // Mettre chaque valeur separement dans request
+                    for (Map.Entry<String, Object> en : mav.getValues().entrySet()) {
+                        req.setAttribute(en.getKey(), en.getValue());
                     }
 
                     if (mav.getView() != null && !mav.getView().isEmpty()) {
