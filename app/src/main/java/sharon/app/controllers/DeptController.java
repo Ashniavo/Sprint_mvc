@@ -1,5 +1,9 @@
 package sharon.app.controllers;
 
+import java.util.Arrays;
+import java.util.List;
+
+import sharon.app.entity.Departement;
 import sharon.sprintmvc.annotation.Controller;
 import sharon.sprintmvc.annotation.URLMapping;
 import sharon.sprintmvc.utils.ModelAndView;
@@ -19,11 +23,16 @@ public class DeptController {
 
     @URLMapping(value = "/api/dept/list", method = "GET")
     public ModelAndView list() {
+        // Simulation BDD — sera remplace par un vrai DAO plus tard
+        List<Departement> depts = Arrays.asList(
+            new Departement(1, "Informatique"),
+            new Departement(2, "Mathematiques"),
+            new Departement(3, "Physique")
+        );
+
         ModelAndView mav = new ModelAndView();
         mav.setView("dept/list");
-        mav.addValue("message", "Liste des departements chargee !");
-        mav.addValue("dept1", "Informatique");
-        mav.addValue("dept2", "Mathematiques");
+        mav.addValue("depts", depts);
         return mav;
     }
 }
