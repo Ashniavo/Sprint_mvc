@@ -74,12 +74,11 @@ public class FrontControllerServlet extends HttpServlet {
                 Method method = mapping.getMethod();
                 Object result = method.invoke(controller);
 
-                // Cas 1 : ModelAndView → rediriger vers JSP
+                // Cas 1 : ModelAndView
                 if (result instanceof ModelAndView) {
                     ModelAndView mav = (ModelAndView) result;
 
-                    // Mettre chaque valeur separement dans request
-                    for (Map.Entry<String, Object> en : mav.getValues().entrySet()) {
+                    for (Map.Entry<String, List<?>> en : mav.getValues().entrySet()) {
                         req.setAttribute(en.getKey(), en.getValue());
                     }
 
