@@ -5,6 +5,7 @@ import java.io.PrintWriter;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
+import java.lang.reflect.Field;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -173,16 +174,47 @@ public class FrontControllerServlet extends HttpServlet {
 
         for (int i = 0; i < parameters.length; i++) {
             Parameter p = parameters[i];
-            Param ann = p.getAnnotation(Param.class);
-            String paramName = (ann != null && !ann.value().isEmpty()) ? ann.value() : p.getName();
 
-            String raw = req.getParameter(paramName);
-            if ((raw == null || raw.isEmpty()) && ann != null && !ann.defaultValue().isEmpty()) {
-                raw = ann.defaultValue();
+            if (isSimpleType(p.getType())) {
+                Param ann = p.getAnnotation(Param.class);
+                String paramName = (ann != null && !ann.value().isEmpty()) ? ann.value() : p.getName();
+
+                String raw = req.getParameter(paramName);
+                if ((raw == null || raw.isEmpty()) && ann != null && !ann.defaultValue().isEmpty()) {
+                    raw = ann.defaultValue();
+                }
+                args[i] = convertParam(raw, p.getType());
+            } else {
+                args[i] = bindObject(p.getType(), req);
             }
-            args[i] = convertParam(raw, p.getType());
         }
         return args;
+    }
+
+    private boolean isSimpleType(Class<?> type) {
+        return type == String.class || type.isPrimitive()
+                || type == Integer.class || type == Character.class
+                || type == Boolean.class || type == Double.class || type == Long.class;
+    }
+
+    private Object bindObject(Class<?> type, HttpServletRequest req) {
+        try {
+            Object obj = type.getDeclaredConstructor().newInstance();
+            for (Field f : type.getDeclaredFields()) {
+                f.setAccessible(true);
+                Param ann = f.getAnnotation(Param.class);
+                String paramName = (ann != null && !ann.value().isEmpty()) ? ann.value() : f.getName();
+
+                String raw = req.getParameter(paramName);
+                if ((raw == null || raw.isEmpty()) && ann != null && !ann.defaultValue().isEmpty()) {
+                    raw = ann.defaultValue();
+                }
+                f.set(obj, convertParam(raw, f.getType()));
+            }
+            return obj;
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur de binding de l objet " + type.getName(), e);
+        }
     }
 
     private Object convertParam(String raw, Class<?> type) {
