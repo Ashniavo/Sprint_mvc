@@ -3,3 +3,7 @@ target/
 *.jar
 *.war
 .vscode/
+app/README.md
+app/deploy.sh
+app/pom.xml
+app/src/main/resources/
