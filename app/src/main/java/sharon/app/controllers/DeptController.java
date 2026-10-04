@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import sharon.sprintmvc.utils.ModelAndView;
 import sharon.sprintmvc.annotation.*;
+import sharon.app.models.Dept;
 
 @Controller("DeptController")
 public class DeptController {
@@ -53,5 +54,10 @@ public class DeptController {
                         @Param(value = "prenom", defaultValue = "-") String prenom,
                         @Param(value = "age", defaultValue = "0") int age) {
         return "Departement sauvegarde : nom=" + nom + ", prenom=" + prenom + ", age=" + age;
+    }
+
+    @URLMapping(value = "/api/dept/saveObject", method = "POST")
+    public String saveObject(Dept dept) {
+        return "Departement sauvegarde (objet) : " + dept;
     }
 }
