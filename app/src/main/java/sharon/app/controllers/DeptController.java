@@ -31,7 +31,7 @@ public class DeptController {
     }
 
     @URLMapping(value = "/api/dept/saveObject", method = "POST")
-    public String saveObject(Dept dept) {
+    public String saveObject(@Param("dept") Dept dept) {
         return "Departement sauvegarde (objet) : " + dept;
     }
 
