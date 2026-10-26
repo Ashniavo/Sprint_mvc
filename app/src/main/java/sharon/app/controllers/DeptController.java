@@ -9,8 +9,10 @@ import sharon.sprintmvc.annotation.Controller;
 import sharon.sprintmvc.annotation.Param;
 import sharon.sprintmvc.annotation.RestApi;
 import sharon.sprintmvc.annotation.URLMapping;
+import sharon.sprintmvc.utils.Mapfiles;
 import sharon.sprintmvc.utils.ModelAndView;
 import sharon.app.models.Dept;
+import sharon.app.models.Document;
 import sharon.app.models.Ecole;
 import sharon.app.models.Employe;
 import sharon.app.models.User;
@@ -58,6 +60,42 @@ public class DeptController {
         mav.setView("dept/formUser");
         return mav;
     }
+
+    // ==================== Sprint 8 : upload ====================
+
+    @URLMapping(value = "/api/dept/formUpload", method = "GET")
+    public ModelAndView formUpload() {
+        ModelAndView mav = new ModelAndView();
+        mav.setView("dept/formUpload");
+        return mav;
+    }
+
+    @URLMapping(value = "/api/dept/upload", method = "POST")
+    public String upload(@Param("nom") String nom,
+                         @Param("fichier") Mapfiles fichier) {
+        if (fichier == null) {
+            return "Aucun fichier recu";
+        }
+        return "nom=" + nom + ", fichier=" + fichier.getNom()
+                + ", extension=" + fichier.getExtension()
+                + ", taille=" + fichier.getSize() + " octets (enregistre dans upload-path)";
+    }
+
+    @URLMapping(value = "/api/dept/uploadMulti", method = "POST")
+    public String uploadMulti(@Param("fichiers") List<Mapfiles> fichiers) {
+        StringBuilder sb = new StringBuilder("Fichiers recus : " + fichiers.size());
+        for (Mapfiles f : fichiers) {
+            sb.append("\n- ").append(f.getNom()).append(" (").append(f.getSize()).append(" octets)");
+        }
+        return sb.toString();
+    }
+
+    @URLMapping(value = "/api/dept/saveDocument", method = "POST")
+    public String saveDocument(@Param("doc") Document doc) {
+        return "Document recu : " + doc;
+    }
+
+    // ==================== Anciennes routes ====================
 
     @URLMapping(value = "/api/dept/list", method = "GET")
     public ModelAndView list() {
