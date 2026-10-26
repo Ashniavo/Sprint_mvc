@@ -1,6 +1,7 @@
 package sharon.sprintmvc.controllers;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
@@ -8,6 +9,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -20,13 +24,16 @@ import java.util.TreeSet;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.Part;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
+import sharon.sprintmvc.utils.Mapfiles;
 import sharon.sprintmvc.utils.Mapping;
 import sharon.sprintmvc.utils.ModelAndView;
 import sharon.sprintmvc.utils.UrlKey;
@@ -35,12 +42,18 @@ import sharon.sprintmvc.annotation.Controller;
 import sharon.sprintmvc.annotation.RestApi;
 import sharon.sprintmvc.annotation.Param;
 
+@MultipartConfig(
+        fileSizeThreshold = 1024 * 1024,        // au-dela de 1 Mo, stocke sur disque
+        maxFileSize = 10 * 1024 * 1024,         // 10 Mo par fichier
+        maxRequestSize = 50 * 1024 * 1024       // 50 Mo par requete
+)
 public class FrontControllerServlet extends HttpServlet {
 
     List<String> listClasses;
     Map<UrlKey, Mapping> urlMapping;
     String viewPrefix;
     String viewSuffix;
+    String uploadPath;
     private final Gson gson = new GsonBuilder().serializeNulls().create();
 
     @SuppressWarnings("unchecked")
@@ -59,6 +72,17 @@ public class FrontControllerServlet extends HttpServlet {
 
         viewPrefix = (String) getServletContext().getAttribute("prefix");
         viewSuffix = (String) getServletContext().getAttribute("suffix");
+
+        // Sprint 8 : dossier d'upload defini dans le web.xml (context-param "upload-path")
+        uploadPath = getServletContext().getInitParameter("upload-path");
+        if (uploadPath != null && !uploadPath.isBlank()) {
+            try {
+                Files.createDirectories(Paths.get(uploadPath));
+            } catch (IOException e) {
+                throw new ServletException(
+                        "Impossible de creer le repertoire d'upload " + uploadPath, e);
+            }
+        }
     }
 
     @Override
@@ -185,8 +209,6 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    // ==================== BINDING (Sprint 7 / 7bis) ====================
-
     /** Construit les arguments de la methode a partir des parametres de la requete. */
     private Object[] buildArgs(Method method, HttpServletRequest req) {
         Parameter[] parameters = method.getParameters();
@@ -200,11 +222,14 @@ public class FrontControllerServlet extends HttpServlet {
             if (isSimpleType(p.getType())) {
                 // Type simple : char, int, String, Date...
                 args[i] = convertParam(readValue(req, name, ann), p.getType());
+            } else if (p.getType() == Mapfiles.class) {
+                // Sprint 8 : un fichier
+                args[i] = readFile(name, req);
             } else if (List.class.isAssignableFrom(p.getType())) {
-                // Argument de type List<X> (X simple ou objet)
+                // Argument de type List<X> (X simple, fichier ou objet)
                 args[i] = bindList(p.getParameterizedType(), name, req);
             } else {
-                // Objet complet 
+                // Objet complet : le nom de l'argument sert de prefixe (user.nom, ecole.nom)
                 args[i] = bindObject(p.getType(), name, req);
             }
         }
@@ -228,8 +253,8 @@ public class FrontControllerServlet extends HttpServlet {
     }
 
     /**
-     * Cree un objet et remplit ses champs. Recursif : un champ objet ou liste
-     * est rempli avec un prefixe (ex: "user.nom", "employes[0].nom").
+     * Cree un objet et remplit ses champs. Recursif : un champ objet, liste ou fichier
+     * est rempli avec un prefixe (ex: "user.nom", "employes[0].nom", "doc.fichier").
      */
     private Object bindObject(Class<?> type, String prefix, HttpServletRequest req) {
         try {
@@ -244,6 +269,8 @@ public class FrontControllerServlet extends HttpServlet {
                 Class<?> fieldType = f.getType();
                 if (isSimpleType(fieldType)) {
                     f.set(obj, convertParam(readValue(req, fullName, ann), fieldType));
+                } else if (fieldType == Mapfiles.class) {
+                    f.set(obj, readFile(fullName, req));
                 } else if (List.class.isAssignableFrom(fieldType)) {
                     f.set(obj, bindList(f.getGenericType(), fullName, req));
                 } else {
@@ -256,7 +283,6 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    /*rempli une liste   */
     private List<Object> bindList(Type generic, String fullName, HttpServletRequest req) {
         Class<?> elementType = String.class;
         if (generic instanceof ParameterizedType) {
@@ -264,6 +290,11 @@ public class FrontControllerServlet extends HttpServlet {
             if (arg instanceof Class) {
                 elementType = (Class<?>) arg;
             }
+        }
+
+        // Sprint 8 : liste de fichiers
+        if (elementType == Mapfiles.class) {
+            return new ArrayList<Object>(readFiles(fullName, req));
         }
 
         List<Object> list = new ArrayList<>();
@@ -308,6 +339,86 @@ public class FrontControllerServlet extends HttpServlet {
         return indexes;
     }
 
+    // ==================== UPLOAD (Sprint 8) ====================
+
+    /** Un formulaire sans enctype="multipart/form-data" ne contient aucun fichier. */
+    private boolean isMultipart(HttpServletRequest req) {
+        String type = req.getContentType();
+        return type != null && type.toLowerCase().startsWith("multipart/");
+    }
+
+    /** Renvoie le fichier envoye sous ce nom (deja enregistre), ou null si aucun fichier choisi. */
+    private Mapfiles readFile(String name, HttpServletRequest req) {
+        if (!isMultipart(req)) {
+            return null;
+        }
+        try {
+            Part part = req.getPart(name);
+            return part == null ? null : saveFile(part);
+        } catch (IOException | ServletException e) {
+            throw new RuntimeException("Erreur de lecture du fichier '" + name + "'", e);
+        }
+    }
+
+    /** Renvoie tous les fichiers envoyes sous ce nom (input multiple). */
+    private List<Mapfiles> readFiles(String name, HttpServletRequest req) {
+        List<Mapfiles> files = new ArrayList<>();
+        if (!isMultipart(req)) {
+            return files;
+        }
+        try {
+            for (Part part : req.getParts()) {
+                if (name.equals(part.getName())) {
+                    Mapfiles file = saveFile(part);
+                    if (file != null) {
+                        files.add(file);
+                    }
+                }
+            }
+        } catch (IOException | ServletException e) {
+            throw new RuntimeException("Erreur de lecture des fichiers '" + name + "'", e);
+        }
+        return files;
+    }
+
+    /** Enregistre le fichier dans upload-path et renvoie un Mapfiles (nom, extension, contenu). */
+    private Mapfiles saveFile(Part part) throws IOException {
+        String submitted = part.getSubmittedFileName();
+        if (submitted == null || submitted.isEmpty()) {
+            return null; // aucun fichier choisi dans le formulaire
+        }
+
+        // Securite : on garde seulement le nom ("../../x.jsp" ou "C:\\dossier\\x.jsp" -> "x.jsp")
+        String path = submitted.replace('\\', '/');
+        String fileName = path.substring(path.lastIndexOf('/') + 1);
+        if (fileName.isEmpty()) {
+            return null;
+        }
+
+        if (uploadPath == null || uploadPath.isBlank()) {
+            throw new IOException("Le parametre de contexte 'upload-path' est absent du web.xml");
+        }
+        Path dir = Paths.get(uploadPath).toAbsolutePath().normalize();
+        Files.createDirectories(dir);
+        Path target = dir.resolve(fileName).normalize();
+        if (!target.startsWith(dir) || target.equals(dir)) {
+            throw new IOException("Nom de fichier invalide : " + fileName);
+        }
+
+        byte[] bytes;
+        try (InputStream in = part.getInputStream()) {
+            bytes = in.readAllBytes();
+        }
+        Files.write(target, bytes);
+
+        int dot = fileName.lastIndexOf('.');
+        String extension = (dot > 0 && dot < fileName.length() - 1)
+                ? fileName.substring(dot + 1) : "";
+        return new Mapfiles(fileName, extension, bytes);
+    }
+
+    // ==================== CONVERSION ====================
+
     /** Convertit le texte recu (HTTP) vers le type Java attendu. */
     private Object convertParam(String raw, Class<?> type) {
         // Champ vide (ex: input number laisse vide) = absent, sauf pour String
@@ -334,6 +445,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     /** Accepte : 2026-10-10 (input date), 2026-10-10T14:30 (datetime-local), 10/10/2026. */
     private Date parseDate(String raw) {
+        // le format le plus long en premier : parse() ignore la fin du texte
         String[] formats = {"yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd", "dd/MM/yyyy"};
         for (String f : formats) {
             try {
