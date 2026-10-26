@@ -8,6 +8,11 @@
     <servlet>
         <servlet-name>frontController</servlet-name>
         <servlet-class>sharon.sprintmvc.controllers.FrontControllerServlet</servlet-class>
+        <multipart-config>
+            <max-file-size>10485760</max-file-size>
+            <max-request-size>52428800</max-request-size>
+            <file-size-threshold>1048576</file-size-threshold>
+        </multipart-config>
     </servlet>
 
     <servlet-mapping>
@@ -37,6 +42,12 @@
     <context-param>
         <param-name>view.suffix</param-name>
         <param-value>.jsp</param-value>
+    </context-param>
+
+    <!-- Sprint 8 : dossier ou les fichiers uploades sont enregistres -->
+    <context-param>
+        <param-name>upload-path</param-name>
+        <param-value>/home/sharon/uploads</param-value>
     </context-param>
 
 </web-app>
