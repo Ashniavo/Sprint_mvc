@@ -15,12 +15,14 @@ import java.nio.file.Paths;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
@@ -28,6 +30,7 @@ import jakarta.servlet.annotation.MultipartConfig;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import jakarta.servlet.http.Part;
 
 import com.google.gson.Gson;
@@ -36,6 +39,7 @@ import com.google.gson.GsonBuilder;
 import sharon.sprintmvc.utils.Mapfiles;
 import sharon.sprintmvc.utils.Mapping;
 import sharon.sprintmvc.utils.ModelAndView;
+import sharon.sprintmvc.utils.MySession;
 import sharon.sprintmvc.utils.UrlKey;
 import sharon.sprintmvc.utils.Utils;
 import sharon.sprintmvc.annotation.Controller;
@@ -43,14 +47,15 @@ import sharon.sprintmvc.annotation.RestApi;
 import sharon.sprintmvc.annotation.Param;
 
 @MultipartConfig(
-        fileSizeThreshold = 1024 * 1024,        // au-dela de 1 Mo, stocke sur disque
-        maxFileSize = 10 * 1024 * 1024,         // 10 Mo par fichier
-        maxRequestSize = 50 * 1024 * 1024       // 50 Mo par requete
+        fileSizeThreshold = 1024 * 1024,
+        maxFileSize = 10 * 1024 * 1024,
+        maxRequestSize = 50 * 1024 * 1024
 )
 public class FrontControllerServlet extends HttpServlet {
 
     List<String> listClasses;
     Map<UrlKey, Mapping> urlMapping;
+    Map<String, MySession> sessions;
     String viewPrefix;
     String viewSuffix;
     String uploadPath;
@@ -73,7 +78,11 @@ public class FrontControllerServlet extends HttpServlet {
         viewPrefix = (String) getServletContext().getAttribute("prefix");
         viewSuffix = (String) getServletContext().getAttribute("suffix");
 
-        // Sprint 8 : dossier d'upload defini dans le web.xml (context-param "upload-path")
+        sessions = (Map<String, MySession>) getServletContext().getAttribute("sessions");
+        if (sessions == null) {
+            sessions = new ConcurrentHashMap<>();
+        }
+
         uploadPath = getServletContext().getInitParameter("upload-path");
         if (uploadPath != null && !uploadPath.isBlank()) {
             try {
@@ -115,7 +124,8 @@ public class FrontControllerServlet extends HttpServlet {
                 Object[] args = buildArgs(method, req);
                 Object result = method.invoke(controller, args);
 
-                // Cas 0 : @RestApi -> reponse JSON
+                synchronizeSessions(args, req);
+
                 if (method.isAnnotationPresent(RestApi.class)
                         || mapping.getControllerClass().isAnnotationPresent(RestApi.class)) {
                     Object data = result;
@@ -126,7 +136,6 @@ public class FrontControllerServlet extends HttpServlet {
                     return;
                 }
 
-                // Cas 1 : ModelAndView -> rediriger vers JSP
                 if (result instanceof ModelAndView) {
                     ModelAndView mav = (ModelAndView) result;
 
@@ -144,7 +153,6 @@ public class FrontControllerServlet extends HttpServlet {
                     throw new ServletException("Aucune vue definie pour " + key);
                 }
 
-                // Cas 2 : String -> afficher directement
                 if (result instanceof String) {
                     String text = (String) result;
                     res.setContentType("text/plain;charset=UTF-8");
@@ -155,7 +163,6 @@ public class FrontControllerServlet extends HttpServlet {
                     return;
                 }
 
-                // Cas 3 : void / null -> rien a afficher
                 if (result == null) {
                     res.setContentType("text/plain;charset=UTF-8");
                     try (PrintWriter out = res.getWriter()) {
@@ -209,7 +216,6 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    /** Construit les arguments de la methode a partir des parametres de la requete. */
     private Object[] buildArgs(Method method, HttpServletRequest req) {
         Parameter[] parameters = method.getParameters();
         Object[] args = new Object[parameters.length];
@@ -220,23 +226,20 @@ public class FrontControllerServlet extends HttpServlet {
             String name = (ann != null && !ann.value().isEmpty()) ? ann.value() : p.getName();
 
             if (isSimpleType(p.getType())) {
-                // Type simple : char, int, String, Date...
                 args[i] = convertParam(readValue(req, name, ann), p.getType());
+            } else if (p.getType() == MySession.class) {
+                args[i] = getMySession(req);
             } else if (p.getType() == Mapfiles.class) {
-                // Sprint 8 : un fichier
                 args[i] = readFile(name, req);
             } else if (List.class.isAssignableFrom(p.getType())) {
-                // Argument de type List<X> (X simple, fichier ou objet)
                 args[i] = bindList(p.getParameterizedType(), name, req);
             } else {
-                // Objet complet : le nom de l'argument sert de prefixe (user.nom, ecole.nom)
                 args[i] = bindObject(p.getType(), name, req);
             }
         }
         return args;
     }
 
-    /** Lit un parametre HTTP, ou prend la valeur par defaut de @Param si absent/vide. */
     private String readValue(HttpServletRequest req, String name, Param ann) {
         String raw = req.getParameter(name);
         if ((raw == null || raw.isEmpty()) && ann != null && !ann.defaultValue().isEmpty()) {
@@ -252,10 +255,6 @@ public class FrontControllerServlet extends HttpServlet {
                 || type == Date.class;
     }
 
-    /**
-     * Cree un objet et remplit ses champs. Recursif : un champ objet, liste ou fichier
-     * est rempli avec un prefixe (ex: "user.nom", "employes[0].nom", "doc.fichier").
-     */
     private Object bindObject(Class<?> type, String prefix, HttpServletRequest req) {
         try {
             Object obj = type.getDeclaredConstructor().newInstance();
@@ -292,7 +291,6 @@ public class FrontControllerServlet extends HttpServlet {
             }
         }
 
-        // Sprint 8 : liste de fichiers
         if (elementType == Mapfiles.class) {
             return new ArrayList<Object>(readFiles(fullName, req));
         }
@@ -321,7 +319,6 @@ public class FrontControllerServlet extends HttpServlet {
         return list;
     }
 
-    /** Trouve les index d'une liste : "employes[0].nom", "employes[1].nom" -> {0, 1}. */
     private Set<Integer> findIndexes(String fullName, HttpServletRequest req) {
         Set<Integer> indexes = new TreeSet<>();
         String start = fullName + "[";
@@ -339,15 +336,38 @@ public class FrontControllerServlet extends HttpServlet {
         return indexes;
     }
 
-    // ==================== UPLOAD (Sprint 8) ====================
+    private MySession getMySession(HttpServletRequest req) {
+        HttpSession session = req.getSession(true);
+        MySession mySession = sessions.computeIfAbsent(session.getId(), id -> new MySession());
+        for (String name : Collections.list(session.getAttributeNames())) {
+            mySession.setAttribute(name, session.getAttribute(name));
+        }
+        return mySession;
+    }
 
-    /** Un formulaire sans enctype="multipart/form-data" ne contient aucun fichier. */
+    private void synchronizeSessions(Object[] args, HttpServletRequest req) {
+        for (Object arg : args) {
+            if (arg instanceof MySession) {
+                MySession ms = (MySession) arg;
+                HttpSession session = req.getSession(true);
+
+                for (String name : Collections.list(session.getAttributeNames())) {
+                    if (!ms.getSessionData().containsKey(name)) {
+                        session.removeAttribute(name);
+                    }
+                }
+                for (Map.Entry<String, Object> en : ms.getSessionData().entrySet()) {
+                    session.setAttribute(en.getKey(), en.getValue());
+                }
+            }
+        }
+    }
+
     private boolean isMultipart(HttpServletRequest req) {
         String type = req.getContentType();
         return type != null && type.toLowerCase().startsWith("multipart/");
     }
 
-    /** Renvoie le fichier envoye sous ce nom (deja enregistre), ou null si aucun fichier choisi. */
     private Mapfiles readFile(String name, HttpServletRequest req) {
         if (!isMultipart(req)) {
             return null;
@@ -360,7 +380,6 @@ public class FrontControllerServlet extends HttpServlet {
         }
     }
 
-    /** Renvoie tous les fichiers envoyes sous ce nom (input multiple). */
     private List<Mapfiles> readFiles(String name, HttpServletRequest req) {
         List<Mapfiles> files = new ArrayList<>();
         if (!isMultipart(req)) {
@@ -381,14 +400,12 @@ public class FrontControllerServlet extends HttpServlet {
         return files;
     }
 
-    /** Enregistre le fichier dans upload-path et renvoie un Mapfiles (nom, extension, contenu). */
     private Mapfiles saveFile(Part part) throws IOException {
         String submitted = part.getSubmittedFileName();
         if (submitted == null || submitted.isEmpty()) {
-            return null; // aucun fichier choisi dans le formulaire
+            return null;
         }
 
-        // Securite : on garde seulement le nom ("../../x.jsp" ou "C:\\dossier\\x.jsp" -> "x.jsp")
         String path = submitted.replace('\\', '/');
         String fileName = path.substring(path.lastIndexOf('/') + 1);
         if (fileName.isEmpty()) {
@@ -417,11 +434,7 @@ public class FrontControllerServlet extends HttpServlet {
         return new Mapfiles(fileName, extension, bytes);
     }
 
-    // ==================== CONVERSION ====================
-
-    /** Convertit le texte recu (HTTP) vers le type Java attendu. */
     private Object convertParam(String raw, Class<?> type) {
-        // Champ vide (ex: input number laisse vide) = absent, sauf pour String
         if (raw != null && raw.isEmpty() && type != String.class) {
             raw = null;
         }
@@ -431,7 +444,7 @@ public class FrontControllerServlet extends HttpServlet {
             if (type == boolean.class || type == Boolean.class) return false;
             if (type == double.class || type == Double.class) return 0.0;
             if (type == long.class || type == Long.class) return 0L;
-            return null; // String, Date ou objet -> null
+            return null;
         }
         if (type == String.class) return raw;
         if (type == Date.class) return parseDate(raw);
@@ -443,9 +456,7 @@ public class FrontControllerServlet extends HttpServlet {
         return raw;
     }
 
-    /** Accepte : 2026-10-10 (input date), 2026-10-10T14:30 (datetime-local), 10/10/2026. */
     private Date parseDate(String raw) {
-        // le format le plus long en premier : parse() ignore la fin du texte
         String[] formats = {"yyyy-MM-dd'T'HH:mm", "yyyy-MM-dd", "dd/MM/yyyy"};
         for (String f : formats) {
             try {
