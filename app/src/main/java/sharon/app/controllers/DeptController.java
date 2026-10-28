@@ -11,6 +11,7 @@ import sharon.sprintmvc.annotation.RestApi;
 import sharon.sprintmvc.annotation.URLMapping;
 import sharon.sprintmvc.utils.Mapfiles;
 import sharon.sprintmvc.utils.ModelAndView;
+import sharon.sprintmvc.utils.MySession;
 import sharon.app.models.Dept;
 import sharon.app.models.Document;
 import sharon.app.models.Ecole;
@@ -93,6 +94,41 @@ public class DeptController {
     @URLMapping(value = "/api/dept/saveDocument", method = "POST")
     public String saveDocument(@Param("doc") Document doc) {
         return "Document recu : " + doc;
+    }
+
+    // ==================== Sprint 9 : session ====================
+
+    @URLMapping(value = "/api/dept/formSession", method = "GET")
+    public ModelAndView formSession() {
+        ModelAndView mav = new ModelAndView();
+        mav.setView("dept/formSession");
+        return mav;
+    }
+
+    @URLMapping(value = "/api/dept/login", method = "POST")
+    public String login(@Param("nom") String nom, MySession session) {
+        session.setAttribute("user", nom);
+        return "Bonjour " + nom + ", vous etes connecte";
+    }
+
+    @URLMapping(value = "/api/dept/profil", method = "GET")
+    public String profil(MySession session) {
+        Object user = session.getAttribute("user");
+        return "Utilisateur en session : " + (user == null ? "aucun" : user);
+    }
+
+    @URLMapping(value = "/api/dept/compteur", method = "GET")
+    public String compteur(MySession session) {
+        Object valeur = session.getAttribute("visites");
+        int visites = (valeur == null ? 0 : (Integer) valeur) + 1;
+        session.setAttribute("visites", visites);
+        return "Nombre de visites : " + visites;
+    }
+
+    @URLMapping(value = "/api/dept/logout", method = "GET")
+    public String logout(MySession session) {
+        session.destroy();
+        return "Session videe";
     }
 
     // ==================== Anciennes routes ====================

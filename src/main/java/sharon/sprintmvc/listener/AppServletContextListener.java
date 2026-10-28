@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
@@ -12,6 +13,7 @@ import jakarta.servlet.ServletContextListener;
 
 import sharon.sprintmvc.annotation.Controller;
 import sharon.sprintmvc.utils.Mapping;
+import sharon.sprintmvc.utils.MySession;
 import sharon.sprintmvc.utils.UrlKey;
 import sharon.sprintmvc.utils.Utils;
 
@@ -22,6 +24,11 @@ public class AppServletContextListener implements ServletContextListener {
         System.out.println("[INIT] Tomcat demarre l'application. Lancement du scan des routes...");
 
         ServletContext appContext = sce.getServletContext();
+
+        // Sprint 9 : registre des sessions (une MySession par identifiant de session HTTP)
+        Map<String, MySession> sessions = new ConcurrentHashMap<>();
+        appContext.setAttribute("sessions", sessions);
+
         String blockPackage = appContext.getInitParameter("package_list");
         String separator = appContext.getInitParameter("list_separator");
         String[] packageList = blockPackage.split(separator != null ? separator : ";");
