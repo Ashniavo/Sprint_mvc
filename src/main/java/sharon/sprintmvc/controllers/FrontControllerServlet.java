@@ -56,6 +56,7 @@ public class FrontControllerServlet extends HttpServlet {
 
     List<String> listClasses;
     Map<UrlKey, Mapping> urlMapping;
+    Map<Class<?>, Object> controllers;
     Map<String, MySession> sessions;
     SecurityService securityService;
     String viewPrefix;
@@ -76,6 +77,8 @@ public class FrontControllerServlet extends HttpServlet {
         if (controllerList != null) {
             listClasses = Utils.intoString(controllerList);
         }
+
+        controllers = (Map<Class<?>, Object>) getServletContext().getAttribute("controllers");
 
         viewPrefix = (String) getServletContext().getAttribute("prefix");
         viewSuffix = (String) getServletContext().getAttribute("suffix");
@@ -130,9 +133,7 @@ public class FrontControllerServlet extends HttpServlet {
             }
 
             try {
-                Object controller = mapping.getControllerClass()
-                                           .getDeclaredConstructor()
-                                           .newInstance();
+                Object controller = getController(mapping);
                 Method method = mapping.getMethod();
                 Object[] args = buildArgs(method, req);
                 Object result = method.invoke(controller, args);
@@ -187,8 +188,7 @@ public class FrontControllerServlet extends HttpServlet {
                 throw new ServletException("Type de retour non supporte pour "
                         + key + " : " + result.getClass().getName());
 
-            } catch (InstantiationException | IllegalAccessException |
-                     InvocationTargetException | NoSuchMethodException e) {
+            } catch (IllegalAccessException | InvocationTargetException e) {
 
                 Method m = mapping.getMethod();
                 if (m.isAnnotationPresent(RestApi.class)
@@ -220,6 +220,15 @@ public class FrontControllerServlet extends HttpServlet {
                 }
             }
         }
+    }
+
+    private Object getController(Mapping mapping) throws ServletException {
+        Object controller = controllers == null ? null : controllers.get(mapping.getControllerClass());
+        if (controller == null) {
+            throw new ServletException(
+                    "Aucune instance du controller " + mapping.getControllerClass().getName());
+        }
+        return controller;
     }
 
     private void showLoginWithMessageNeedConnexion(HttpServletRequest req, HttpServletResponse res)

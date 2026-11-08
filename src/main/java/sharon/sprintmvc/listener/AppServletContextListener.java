@@ -1,6 +1,7 @@
 package sharon.sprintmvc.listener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -25,7 +26,6 @@ public class AppServletContextListener implements ServletContextListener {
 
         ServletContext appContext = sce.getServletContext();
 
-        // Sprint 9 : registre des sessions (une MySession par identifiant de session HTTP)
         Map<String, MySession> sessions = new ConcurrentHashMap<>();
         appContext.setAttribute("sessions", sessions);
 
@@ -49,11 +49,21 @@ public class AppServletContextListener implements ServletContextListener {
         try {
             Map<UrlKey, Mapping> routesMapping = Utils.buildUrlMapping(classList);
 
-            // Stocker routes et controllers
             appContext.setAttribute("routesWithMethod", routesMapping);
             appContext.setAttribute("controllerList", classList);
 
-            // Stocker prefix et suffix des vues
+            Map<Class<?>, Object> controllers = new HashMap<>();
+            for (Class<?> controllerClass : classList) {
+                try {
+                    controllers.put(controllerClass, controllerClass.getDeclaredConstructor().newInstance());
+                } catch (ReflectiveOperationException e) {
+                    throw new RuntimeException(
+                            "Impossible d'instancier le controller " + controllerClass.getName(), e);
+                }
+            }
+            appContext.setAttribute("controllers", controllers);
+            System.out.println("[INFO] " + controllers.size() + " controller(s) instancie(s) (singleton)");
+
             String viewPrefix = appContext.getInitParameter("view.prefix");
             String viewSuffix = appContext.getInitParameter("view.suffix");
             appContext.setAttribute("prefix", viewPrefix);
