@@ -40,6 +40,7 @@ import sharon.sprintmvc.utils.Mapfiles;
 import sharon.sprintmvc.utils.Mapping;
 import sharon.sprintmvc.utils.ModelAndView;
 import sharon.sprintmvc.utils.MySession;
+import sharon.sprintmvc.utils.SecurityService;
 import sharon.sprintmvc.utils.UrlKey;
 import sharon.sprintmvc.utils.Utils;
 import sharon.sprintmvc.annotation.Controller;
@@ -56,6 +57,7 @@ public class FrontControllerServlet extends HttpServlet {
     List<String> listClasses;
     Map<UrlKey, Mapping> urlMapping;
     Map<String, MySession> sessions;
+    SecurityService securityService;
     String viewPrefix;
     String viewSuffix;
     String uploadPath;
@@ -82,6 +84,11 @@ public class FrontControllerServlet extends HttpServlet {
         if (sessions == null) {
             sessions = new ConcurrentHashMap<>();
         }
+
+        String isConnectedSessionName = getServletContext().getInitParameter("isConnectedSessionName");
+        securityService = new SecurityService(
+                isConnectedSessionName != null && !isConnectedSessionName.isBlank()
+                        ? isConnectedSessionName : "isConnected");
 
         uploadPath = getServletContext().getInitParameter("upload-path");
         if (uploadPath != null && !uploadPath.isBlank()) {
@@ -115,6 +122,12 @@ public class FrontControllerServlet extends HttpServlet {
         if (urlMapping != null && urlMapping.containsKey(key)) {
             Mapping mapping = urlMapping.get(key);
             System.out.println("Route trouvee : " + key + " -> " + mapping);
+
+            if (securityService.needsLogin(mapping.getMethod())
+                    && !securityService.accesAuthorised(req, mapping.getMethod())) {
+                showLoginWithMessageNeedConnexion(req, res);
+                return;
+            }
 
             try {
                 Object controller = mapping.getControllerClass()
@@ -207,6 +220,13 @@ public class FrontControllerServlet extends HttpServlet {
                 }
             }
         }
+    }
+
+    private void showLoginWithMessageNeedConnexion(HttpServletRequest req, HttpServletResponse res)
+            throws ServletException, IOException {
+        req.setAttribute("error", "Vous devez vous connecter");
+        res.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        req.getRequestDispatcher(viewPrefix + "login" + viewSuffix).forward(req, res);
     }
 
     private void sendJson(HttpServletResponse res, Object data) throws IOException {
