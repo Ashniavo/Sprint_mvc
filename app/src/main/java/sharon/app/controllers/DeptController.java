@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import sharon.sprintmvc.annotation.Controller;
+import sharon.sprintmvc.annotation.NeedLogin;
 import sharon.sprintmvc.annotation.Param;
 import sharon.sprintmvc.annotation.RestApi;
 import sharon.sprintmvc.annotation.URLMapping;
@@ -17,6 +18,7 @@ import sharon.app.models.Document;
 import sharon.app.models.Ecole;
 import sharon.app.models.Employe;
 import sharon.app.models.User;
+import sharon.app.models.Utilisateur;
 
 @Controller("DeptController")
 public class DeptController {
@@ -62,8 +64,6 @@ public class DeptController {
         return mav;
     }
 
-    // ==================== Sprint 8 : upload ====================
-
     @URLMapping(value = "/api/dept/formUpload", method = "GET")
     public ModelAndView formUpload() {
         ModelAndView mav = new ModelAndView();
@@ -95,8 +95,6 @@ public class DeptController {
     public String saveDocument(@Param("doc") Document doc) {
         return "Document recu : " + doc;
     }
-
-    // ==================== Sprint 9 : session ====================
 
     @URLMapping(value = "/api/dept/formSession", method = "GET")
     public ModelAndView formSession() {
@@ -131,7 +129,40 @@ public class DeptController {
         return "Session videe";
     }
 
-    // ==================== Anciennes routes ====================
+    @URLMapping(value = "/api/dept/formLogin", method = "GET")
+    public ModelAndView formLogin() {
+        ModelAndView mav = new ModelAndView();
+        mav.setView("login");
+        return mav;
+    }
+
+    @URLMapping(value = "/api/dept/connexion", method = "POST")
+    public String connexion(@Param("nom") String nom,
+                            @Param(value = "role", defaultValue = "user") String role,
+                            MySession session) {
+        session.setAttribute("isConnected", new Utilisateur(nom, role));
+        return "Connecte : " + nom + " (role " + role + ")";
+    }
+
+    @URLMapping(value = "/api/dept/deconnexion", method = "GET")
+    public String deconnexion(MySession session) {
+        session.removeAttribute("isConnected");
+        return "Deconnecte";
+    }
+
+    @NeedLogin
+    @URLMapping(value = "/api/dept/protege", method = "GET")
+    public String protege(MySession session) {
+        Utilisateur u = (Utilisateur) session.getAttribute("isConnected");
+        return "Zone protegee : bonjour " + u;
+    }
+
+    @NeedLogin("admin")
+    @URLMapping(value = "/api/dept/admin", method = "GET")
+    public String admin(MySession session) {
+        Utilisateur u = (Utilisateur) session.getAttribute("isConnected");
+        return "Zone admin : bonjour " + u;
+    }
 
     @URLMapping(value = "/api/dept/list", method = "GET")
     public ModelAndView list() {
