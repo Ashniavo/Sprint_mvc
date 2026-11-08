@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import sharon.sprintmvc.annotation.Controller;
 import sharon.sprintmvc.annotation.NeedLogin;
@@ -22,6 +23,8 @@ import sharon.app.models.Utilisateur;
 
 @Controller("DeptController")
 public class DeptController {
+
+    private final AtomicInteger appels = new AtomicInteger();
 
     @URLMapping(value = "/api/dept/new", method = "GET")
     public String create() {
@@ -162,6 +165,11 @@ public class DeptController {
     public String admin(MySession session) {
         Utilisateur u = (Utilisateur) session.getAttribute("isConnected");
         return "Zone admin : bonjour " + u;
+    }
+
+    @URLMapping(value = "/api/dept/instance", method = "GET")
+    public String instance() {
+        return "Instance " + System.identityHashCode(this) + " - appel numero " + appels.incrementAndGet();
     }
 
     @URLMapping(value = "/api/dept/list", method = "GET")
